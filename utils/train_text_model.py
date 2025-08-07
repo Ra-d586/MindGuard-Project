@@ -9,19 +9,50 @@ from transformers import DistilBertTokenizer, DistilBertModel
 import joblib
 import os
 from tqdm import tqdm
+from datasets import load_dataset
 
-# Dummy dataset for text + emotion
-# Replace with actual real dataset if available
-data = {
-    "text": [
-        "I feel great today", "I'm so tired and down", "Not sure what I feel", 
-        "Life is amazing", "I’m anxious about tomorrow", "I’m okay, I guess",
-        "I feel very low", "I’m excited about the weekend", "Nothing makes sense",
-        "I am really relaxed and calm"
-    ],
-    "label": ["happy", "sad", "neutral", "happy", "stress", "neutral", "sad", "happy", "sad", "happy"]
-}
-df = pd.DataFrame(data)
+
+
+dataset = load_dataset("go_emotions", "raw")
+
+
+
+# Convert to DataFrame
+df = dataset['train'].to_pandas()
+print("Available columns:", df.columns.tolist())
+
+# List of all possible emotions (columns with 0/1 values)
+emotion_cols = [
+    'admiration', 'amusement', 'anger', 'annoyance', 'approval', 'caring',
+    'confusion', 'curiosity', 'desire', 'disappointment', 'disapproval',
+    'disgust', 'embarrassment', 'excitement', 'fear', 'gratitude', 'grief',
+    'joy', 'love', 'nervousness', 'optimism', 'pride', 'realization', 'relief',
+    'remorse', 'sadness', 'surprise', 'neutral'
+]
+
+# Keep only rows with a single label (sum == 1)
+df['label_count'] = df[emotion_cols].sum(axis=1)
+df = df[df['label_count'] == 1]
+
+# Get the label name (emotion with value == 1)
+df['emotion'] = df[emotion_cols].idxmax(axis=1)
+
+# Filter to core emotions
+# Filter to core emotions
+core_emotions = ['joy', 'sadness', 'anger', 'neutral', 'fear']
+df = df[df['emotion'].isin(core_emotions)]
+
+# Rename for consistency
+df = df.rename(columns={"text": "text", "emotion": "label"})
+
+# Reduce dataset size to speed up prototyping
+df = df.sample(n=2000, random_state=42).reset_index(drop=True)
+
+print(f"✅ Loaded {len(df)} labeled examples from GoEmotions (core emotions only)")
+
+
+
+
 
 # Encode labels
 le = LabelEncoder()
